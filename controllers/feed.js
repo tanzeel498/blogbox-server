@@ -3,19 +3,30 @@ const path = require("path");
 
 const { validationResult } = require("express-validator");
 
+const ITEMS_PER_PAGE = 2;
+
 const Post = require("../models/post");
 
-exports.getPosts = (req, res, next) => {
-  Post.find()
-    .then((posts) => {
-      if (!posts) {
-        const error = new Error("No Posts found");
-        error.statusCode = 404;
-        throw error;
-      }
-      res.status(200).json({ message: "Post fetched", posts });
-    })
-    .catch((err) => next(err));
+exports.getPosts = async (req, res, next) => {
+  const { page } = req.query || 1;
+  try {
+    const numItems = await Post.find().countDocuments();
+    Post.find()
+      .skip((page - 1) * ITEMS_PER_PAGE)
+      .limit(ITEMS_PER_PAGE)
+      .then((posts) => {
+        if (!posts) {
+          const error = new Error("No Posts found");
+          error.statusCode = 404;
+          throw error;
+        }
+        res
+          .status(200)
+          .json({ message: "Post fetched", posts, totalItems: numItems });
+      });
+  } catch (err) {
+    next(err);
+  }
 };
 
 exports.getPost = (req, res, next) => {
@@ -103,6 +114,25 @@ exports.updatePost = (req, res, next) => {
       res
         .status(200)
         .json({ message: "Post updated Successfully!", post: updatedPost });
+    })
+    .catch((err) => next(err));
+};
+
+exports.deletePost = (req, res, next) => {
+  const { postId } = req.params;
+  Post.findById(postId)
+    .then((post) => {
+      if (!post) {
+        const error = new Error("No Post exists");
+        error.statusCode = 404;
+        throw error;
+      }
+      // compare logged in user with the user of this post
+      return Post.findByIdAndDelete(postId);
+    })
+    .then((result) => {
+      console.log(result);
+      res.status(200).json({ message: "Post deleted!" });
     })
     .catch((err) => next(err));
 };

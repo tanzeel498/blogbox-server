@@ -6,6 +6,7 @@ const { validationResult } = require("express-validator");
 const ITEMS_PER_PAGE = 2;
 
 const Post = require("../models/post");
+const User = require("../models/user");
 
 exports.getPosts = async (req, res, next) => {
   const { page } = req.query || 1;
@@ -14,6 +15,7 @@ exports.getPosts = async (req, res, next) => {
     Post.find()
       .skip((page - 1) * ITEMS_PER_PAGE)
       .limit(ITEMS_PER_PAGE)
+      .populate("creator")
       .then((posts) => {
         if (!posts) {
           const error = new Error("No Posts found");
@@ -43,7 +45,7 @@ exports.getPost = (req, res, next) => {
     .catch((err) => next(err));
 };
 
-exports.createPost = (req, res) => {
+exports.createPost = async (req, res) => {
   const result = validationResult(req);
   if (!result.isEmpty()) {
     const error = new Error("Validation Failed, entered data is Incorrect!");
@@ -57,22 +59,27 @@ exports.createPost = (req, res) => {
   }
   const { title, content } = req.body;
 
-  const post = new Post({
-    title,
-    content,
-    creator: { name: "Tanzeel" },
-    imageUrl: req.file.path,
-  });
+  try {
+    const post = new Post({
+      title,
+      content,
+      creator: req.userId,
+      imageUrl: req.file.path,
+    });
 
-  post
-    .save()
-    .then((postData) => {
-      res.status(201).json({
-        message: "Post created successfully",
-        post: postData,
-      });
-    })
-    .catch((err) => next(err));
+    post.save();
+    const user = await User.findById(req.userId);
+    user.posts.push(post);
+    user.save(); // no need to await
+
+    res.status(201).json({
+      message: "Post created successfully",
+      post: post,
+      creator: { _id: user._id, name: user.name },
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 exports.updatePost = (req, res, next) => {
@@ -103,6 +110,11 @@ exports.updatePost = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
+      if (post.creator.toString() !== req.userId) {
+        const error = new Error("Not Authorized!");
+        error.statusCode = 403;
+        throw error;
+      }
 
       if (imageUrl !== post.imageUrl) clearImage(post.imageUrl);
       post.title = title;
@@ -127,8 +139,19 @@ exports.deletePost = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
+      if (post.creator.toString() !== req.userId) {
+        const error = new Error("Not Authorized!");
+        error.statusCode = 403;
+        throw error;
+      }
       // compare logged in user with the user of this post
+      clearImage(post.imageUrl);
       return Post.findByIdAndDelete(postId);
+    })
+    .then((result) => User.findById(req.userId))
+    .then((user) => {
+      user.posts.pull(postId);
+      return user.save();
     })
     .then((result) => {
       console.log(result);

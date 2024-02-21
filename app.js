@@ -52,6 +52,9 @@ app.use((req, res, next) => {
 
 io.on("connection", (socket) => {
   console.log("A user connected!");
+  socket.on("disconnect", () => {
+    console.log("A user Disconnected!");
+  });
 });
 
 app.use("/auth", authRoutes);

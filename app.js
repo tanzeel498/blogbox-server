@@ -3,14 +3,12 @@ const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const { createServer } = require("node:http");
+const { createHandler } = require("graphql-http/lib/use/express");
 
-const feedRoutes = require("./routes/feed");
-const authRoutes = require("./routes/auth");
+const graphqlSchema = require("./graphql/schema");
+const graphqlResolver = require("./graphql/resolvers");
 
 const app = express();
-const httpServer = createServer(app);
-const io = require("./socket").init(httpServer);
 
 const fileStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -36,7 +34,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 app.use(express.json());
-
+app.use(multer({ storage: fileStorage, fileFilter }).single("image"));
 app.use("/images", express.static(path.join(__dirname, "images")));
 
 // below controller is to allow cors
@@ -50,19 +48,11 @@ app.use((req, res, next) => {
   next();
 });
 
-io.on("connection", (socket) => {
-  console.log("A user connected!");
-  socket.on("disconnect", () => {
-    console.log("A user Disconnected!");
-  });
-});
-
-app.use("/auth", authRoutes);
 app.use(
-  "/feed",
-  multer({ storage: fileStorage, fileFilter }).single("image"),
-  feedRoutes
+  "/graphql",
+  createHandler({ schema: graphqlSchema, rootValue: graphqlResolver })
 );
+
 app.use((error, req, res, next) => {
   console.log(error);
   const status = error.statusCode || 500;
@@ -74,6 +64,6 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("Mongoose Connected!");
-    httpServer.listen(8080);
+    app.listen(8080);
   })
   .catch((err) => console.error(err));

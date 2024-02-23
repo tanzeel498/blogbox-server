@@ -4,9 +4,11 @@ const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
 const { createHandler } = require("graphql-http/lib/use/express");
+const { ruruHTML } = require("ruru/server");
 
 const graphqlSchema = require("./graphql/schema");
 const graphqlResolver = require("./graphql/resolvers");
+const auth = require("./middleware/auth");
 
 const app = express();
 
@@ -42,16 +44,35 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE"
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
   );
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
   next();
 });
 
+app.use(auth);
 app.use(
   "/graphql",
-  createHandler({ schema: graphqlSchema, rootValue: graphqlResolver })
+  createHandler({
+    schema: graphqlSchema,
+    rootValue: graphqlResolver,
+    formatError(err) {
+      if (!err.originalError) return err;
+      const { code, data } = err.originalError;
+      const message = err.message || "An error occured!";
+      return { data, code, message };
+    },
+  })
 );
+
+// Serve the GraphiQL IDE.
+app.get("/", (_req, res) => {
+  res.type("html");
+  res.end(ruruHTML({ endpoint: "/graphql" }));
+});
 
 app.use((error, req, res, next) => {
   console.log(error);

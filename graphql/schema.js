@@ -42,6 +42,7 @@ module.exports = buildSchema(`
   }
   
   type Query {
+    hello(name: String): String!
     login(email: String!, password: String!): AuthData!
   }
 `);

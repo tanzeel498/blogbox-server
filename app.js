@@ -3,8 +3,9 @@ const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const { createHandler } = require("graphql-http/lib/use/express");
-const { ruruHTML } = require("ruru/server");
+// const { createHandler } = require("graphql-http/lib/use/express");
+// const { ruruHTML } = require("ruru/server");
+// const cors = require("cors");
 
 const graphqlSchema = require("./graphql/schema");
 const graphqlResolver = require("./graphql/resolvers");
@@ -39,12 +40,13 @@ app.use(express.json());
 app.use(multer({ storage: fileStorage, fileFilter }).single("image"));
 app.use("/images", express.static(path.join(__dirname, "images")));
 
+// app.use(cors());
 // below controller is to allow cors
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    "GET, POST, PUT, PATCH, DELETE"
   );
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
@@ -72,13 +74,6 @@ app.use(
 app.get("/", (_req, res) => {
   res.type("html");
   res.end(ruruHTML({ endpoint: "/graphql" }));
-});
-
-app.use((error, req, res, next) => {
-  console.log(error);
-  const status = error.statusCode || 500;
-  const { message, data } = error;
-  res.status(status).json({ message, data });
 });
 
 mongoose

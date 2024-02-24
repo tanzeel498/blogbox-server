@@ -3,15 +3,21 @@ const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
-// const { createHandler } = require("graphql-http/lib/use/express");
-// const { ruruHTML } = require("ruru/server");
-// const cors = require("cors");
+const { createYoga, createSchema } = require("graphql-yoga");
 
 const graphqlSchema = require("./graphql/schema");
 const graphqlResolver = require("./graphql/resolvers");
 const auth = require("./middleware/auth");
 
 const app = express();
+
+const schema = createSchema({
+  typeDefs: graphqlSchema,
+  resolvers: graphqlResolver,
+});
+const yoga = createYoga({
+  schema,
+});
 
 const fileStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -56,25 +62,7 @@ app.use((req, res, next) => {
 });
 
 app.use(auth);
-app.use(
-  "/graphql",
-  createHandler({
-    schema: graphqlSchema,
-    rootValue: graphqlResolver,
-    formatError(err) {
-      if (!err.originalError) return err;
-      const { code, data } = err.originalError;
-      const message = err.message || "An error occured!";
-      return { data, code, message };
-    },
-  })
-);
-
-// Serve the GraphiQL IDE.
-app.get("/", (_req, res) => {
-  res.type("html");
-  res.end(ruruHTML({ endpoint: "/graphql" }));
-});
+app.use("/graphql", yoga);
 
 mongoose
   .connect(process.env.MONGODB_URI)

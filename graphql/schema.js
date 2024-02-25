@@ -18,6 +18,7 @@ module.exports = `
     creator: User!
     createdAt: String!
     updatedAt: String!
+    imageUrl: String!
   }
 
   type User {
@@ -34,13 +35,24 @@ module.exports = `
     userId: ID!
   }
 
+  type PostsData {
+    posts: [Post!]!
+    totalPosts: Int!
+  }
+
   type Mutation {
     createUser(userInput: UserInputData): User!
     createPost(postInput: PostInputData): Post!
+    updatePost(id: ID!, postInput: PostInputData): Post!
+    deletePost(id: ID!): Boolean
+    updateStatus(status: String!): User!
   }
   
   type Query {
     hello(name: String): String!
     login(email: String!, password: String!): AuthData!
+    posts(page: Int): PostsData!
+    post(id: ID!): Post!
+    user: User!
   }
 `;

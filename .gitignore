@@ -1,3 +1,6 @@
 node_modules
 .env
 images
+*.log
+*.key
+*.cert

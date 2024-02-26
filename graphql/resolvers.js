@@ -9,6 +9,28 @@ const { clearImage } = require("../util/helpers");
 
 const ITEMS_PER_PAGE = 2;
 
+class UserDoc {
+  constructor(user) {
+    this._id = user._id.toString();
+    this.name = user.name;
+    this.email = user.email;
+    this.status = user.status;
+    this.posts = user.posts;
+  }
+}
+
+class PostDoc {
+  constructor(post) {
+    this._id = post._id.toString();
+    this.title = post.title;
+    this.content = post.content;
+    this.imageUrl = post.imageUrl;
+    this.creator = post.creator;
+    this.createdAt = post.createdAt.toISOString();
+    this.updatedAt = post.updatedAt.toISOString();
+  }
+}
+
 module.exports = {
   Query: {
     hello: function (_, _args, context) {
@@ -46,19 +68,16 @@ module.exports = {
       const posts = await Post.find()
         .skip((pageNumber - 1) * ITEMS_PER_PAGE)
         .limit(ITEMS_PER_PAGE)
-        .populate("creator")
+        .populate("creator", "name")
         .sort({ createdAt: -1 });
       if (!posts) {
         throw new GraphQLError("No Posts found!", {
           extensions: { code: 404 },
         });
       }
+
       return {
-        posts: posts.map((post) => ({
-          ...post._doc,
-          createdAt: post.createdAt.toISOString(),
-          updatedAt: post.updatedAt.toISOString(),
-        })),
+        posts: posts.map((post) => new PostDoc(post)),
         totalPosts,
       };
     },
@@ -77,11 +96,7 @@ module.exports = {
         });
       }
 
-      return {
-        ...post._doc,
-        createdAt: post.createdAt.toISOString(),
-        updatedAt: post.updatedAt.toISOString(),
-      };
+      return new PostDoc(post);
     },
 
     user: async function (_, _args, context) {
@@ -94,7 +109,7 @@ module.exports = {
         });
       }
 
-      return { ...user._doc };
+      return new UserDoc(user);
     },
   },
 
@@ -122,7 +137,7 @@ module.exports = {
       const hashedPassword = await bcrypt.hash(password, 12);
       const user = new User({ email, password: hashedPassword, name });
       const createdUser = await user.save();
-      return createdUser._doc;
+      return new UserDoc(createdUser);
     },
 
     createPost: async function (
@@ -155,11 +170,7 @@ module.exports = {
       user.posts.push(post);
       user.save(); // fire and forget
 
-      return {
-        ...savedPost._doc,
-        createdAt: post.createdAt.toISOString(),
-        updatedAt: post.updatedAt.toISOString(),
-      };
+      return new PostDoc(post);
     },
 
     updatePost: async function (_, { id, postInput }, context) {
@@ -197,11 +208,7 @@ module.exports = {
       post.content = content;
       await post.save();
 
-      return {
-        ...post._doc,
-        createdAt: post.createdAt.toISOString(),
-        updatedAt: post.updatedAt.toISOString(),
-      };
+      return new PostDoc(post);
     },
 
     deletePost: async function (_, { id }, context) {
@@ -239,13 +246,13 @@ module.exports = {
       }
 
       if (status === user.status) {
-        return { ...user._doc };
+        return new UserDoc(user);
       }
 
       user.status = status;
-      await user.save();
+      const savedUser = await user.save();
 
-      return { ...user._doc };
+      return new UserDoc(savedUser);
     },
   },
 };

@@ -1,9 +1,14 @@
 require("dotenv").config();
-const path = require("path");
+const path = require("node:path");
+const https = require("https");
+const fs = require("node:fs");
 const express = require("express");
 const mongoose = require("mongoose");
 const multer = require("multer");
 const { createYoga, createSchema } = require("graphql-yoga");
+const helmet = require("helmet");
+const compression = require("compression");
+const morgan = require("morgan");
 
 const graphqlSchema = require("./graphql/schema");
 const graphqlResolver = require("./graphql/resolvers");
@@ -11,6 +16,9 @@ const auth = require("./middleware/auth");
 const { clearImage } = require("./util/helpers");
 
 const app = express();
+
+const privateKey = fs.readFileSync("server.key");
+const certificate = fs.readFileSync("server.cert");
 
 const schema = createSchema({
   typeDefs: graphqlSchema,
@@ -43,6 +51,18 @@ const fileFilter = (req, file, cb) => {
   cb(null, false);
 };
 
+const accessLogStream = fs.createWriteStream(
+  path.join(__dirname, "access.log"),
+  { flags: "a" }
+);
+
+// app.use(
+//   helmet({
+//     crossOriginResourcePolicy: false,
+//   })
+// );
+app.use(compression());
+app.use(morgan("common", { stream: accessLogStream }));
 app.use(express.json());
 app.use(multer({ storage: fileStorage, fileFilter }).single("image"));
 app.use("/images", express.static(path.join(__dirname, "images")));
@@ -83,6 +103,12 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("Mongoose Connected!");
-    app.listen(8080);
+
+    // https
+    //   .createServer({ key: privateKey, cert: certificate }, app)
+    //   .listen(process.env.PORT || 8080);
+    app.listen(process.env.PORT || 8080);
   })
   .catch((err) => console.error(err));
+
+// process.env.NODE_ENV = "production"
